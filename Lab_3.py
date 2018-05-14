@@ -76,14 +76,13 @@ class Network:
         self.s40_max = ((2 ** 39) - 1)
 
         self.LUT = np.loadtxt('sigmoid_LUT.txt', dtype=np.uint16)
-        print(self.LUT)
 
 
     def fp_dot(self, a, b):
         accumulator = np.int64(0)   # 40 bit accumulator, plus room for overflow
         product = np.int64(0)       # 32 bit product, plus room for overflow
         for i in range(a.shape[0]):
-            product = np.int64(a[i] * b[i])
+            product = np.int64(a[i]) * np.int64(b[i])
             if product > self.s32_max:
                 product = np.int64(self.s32_max)
             elif product < self.s32_min:
@@ -102,11 +101,7 @@ class Network:
             print("Mismatched matrix dimensions")
             return -1
 
-        result = [self.fp_dot(w[row], x) for row in range(w.shape[0])]
-#        for row in range(w.shape[0]):
- #           for column in range(x.shape[1]):
-  #              result[row, column] = self.fp_dot(w[row], x[column])
-
+        result = np.asarray([self.fp_dot(w[row], x) for row in range(w.shape[0])])
         return result
 
     """
@@ -114,16 +109,26 @@ class Network:
     Uses 256 element LUT, plus interpolation
     """
     def sigmoid(self, x):
-        # note: write this function
-        return x
+        bitmask = np.int16(255)
+
+        # format is s3.12, need to offset by
+        index = np.bitwise_and(np.right_shift(x, 8) + 127, bitmask)
+        result = self.LUT[index]
+
+        fractional = np.bitwise_and(x, bitmask)
+        diff = self.LUT[index+1] - self.LUT[index]
+        result += np.right_shift(np.uint16(diff * fractional), 8, dtype=np.uint16)
+
+        return result
 
     """
     Takes array of values, replaces max value with 1, all others with 0
     Returns np.uint8 array
     """
     def one_hot(self, y):
-        # note: write this function
-        return y
+        prediction = np.zeros(y.shape)
+        prediction[np.argmax(y)] = 1
+        return prediction
 
     """
     Forward propagation routine
@@ -131,12 +136,28 @@ class Network:
     """
     def forward_propagate(self, x):
 
-        # cast inputs to 16-bit, multiply with weights,
-        # apply sigmoid function to results
-        hidden_1 = self.sigmoid(self.fp_mat_mul(self.w_i1, np.int16(x)))
-        print(hidden_1)
+        # reformat x from u4.4 to u4.12, multiply with weights
+        hidden_1 = self.fp_mat_mul(self.w_i1, (np.int16(x)*(2**12)))
+        # result is in s15.24 format, reformat to s3.12
+        hidden_1 = np.int16(np.right_shift(hidden_1, 12))
+        # apply sigmoid function, which returns format u4.12
+        hidden_1 = self.sigmoid(hidden_1)
 
-        return x
+        # multiply hidden layer 1 output with hidden layer 2's weights
+        # u4.12 (h1 output) * s3.12 (weights) = s15.24
+        hidden_2 = self.fp_mat_mul(self.w_12, hidden_1)
+        # reformat from s15.24 to s3.12
+        hidden_2 = np.int16(np.right_shift(hidden_2, 12))
+        hidden_2 = self.sigmoid(hidden_2)
+
+        # multiply hidden layer 2 output with output layer's weights
+        # u4.12 (h2 output) * s3.12 (weights) = s15.24
+        output = self.fp_mat_mul(self.w_2o, hidden_2)
+        # reformat from s15.24 to s3.12
+        output = np.int16(np.right_shift(output, 12))
+        output = self.sigmoid(output)
+
+        return output, self.one_hot(output)
 
 
 
@@ -145,7 +166,6 @@ if __name__ == '__main__':
     x, y = load_dataset()
     MLP = Network(3, 3)
 
-    print(MLP.w_i1)
     print(MLP.forward_propagate(x[0]))
 
 
