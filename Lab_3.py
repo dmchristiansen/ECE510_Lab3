@@ -29,7 +29,7 @@ def load_dataset():
     x = np.loadtxt(data_file, dtype='float', delimiter=',', usecols=(0, 1, 2, 3))
     y = np.loadtxt(data_file, dtype='S30', delimiter=',', usecols=(4))
 
-    # convert floats to u8 format
+    # convert floats to u4.4 format
     x = np.uint8(x * (2 ** F_BITS) + 0.5)
 
     # convert classes from string to int
@@ -68,6 +68,46 @@ class Network:
         self.hidden1_size = h1_size
         self.hidden2_size = h2_size
 
+        self.s16_min = (-(2 ** 15))
+        self.s16_max = ((2 ** 15) - 1)
+        self.s32_min = (-(2 ** 31))
+        self.s32_max = ((2 ** 31) - 1)
+        self.s40_min = (-(2 ** 39))
+        self.s40_max = ((2 ** 39) - 1)
+
+        self.LUT = np.loadtxt('sigmoid_LUT.txt', dtype=np.uint16)
+        print(self.LUT)
+
+
+    def fp_dot(self, a, b):
+        accumulator = np.int64(0)   # 40 bit accumulator, plus room for overflow
+        product = np.int64(0)       # 32 bit product, plus room for overflow
+        for i in range(a.shape[0]):
+            product = np.int64(a[i] * b[i])
+            if product > self.s32_max:
+                product = np.int64(self.s32_max)
+            elif product < self.s32_min:
+                product = np.int64(self.s32_min)
+            accumulator += product
+
+        if accumulator > self.s40_max:
+            accumulator = np.int64(self.s40_max)
+        elif accumulator < self.s40_min:
+            accumulator = np.int64(self.s40_min)
+
+        return accumulator
+
+    def fp_mat_mul(self, w, x):
+        if(w.shape[1] != x.shape[0]):
+            print("Mismatched matrix dimensions")
+            return -1
+
+        result = [self.fp_dot(w[row], x) for row in range(w.shape[0])]
+#        for row in range(w.shape[0]):
+ #           for column in range(x.shape[1]):
+  #              result[row, column] = self.fp_dot(w[row], x[column])
+
+        return result
 
     """
     Fixed-point sigmoid approximation
@@ -90,8 +130,14 @@ class Network:
     Currently not using a bias input
     """
     def forward_propagate(self, x):
-        # note: write this function
+
+        # cast inputs to 16-bit, multiply with weights,
+        # apply sigmoid function to results
+        hidden_1 = self.sigmoid(self.fp_mat_mul(self.w_i1, np.int16(x)))
+        print(hidden_1)
+
         return x
+
 
 
 if __name__ == '__main__':
@@ -99,9 +145,8 @@ if __name__ == '__main__':
     x, y = load_dataset()
     MLP = Network(3, 3)
 
-
-
-
+    print(MLP.w_i1)
+    print(MLP.forward_propagate(x[0]))
 
 
 
