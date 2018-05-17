@@ -98,12 +98,26 @@ if __name__ == "__main__":
     
     neural_network = NeuralNetwork()
     
+    print ("Random starting weights (layer 1): ")
+    print (neural_network.weights1)
+    print ("\nRandom starting weights (layer 2): ")
+    print (neural_network.weights2)
+    print ("\nRandom starting weights (layer 3): ")
+    print (neural_network.weights3)
+
     # the training set   
     training_set_inputs = X
     training_set_outputs = labels_
-    
+
     neural_network.train(training_set_inputs, training_set_outputs, 2000)
-    
+
+    print ("\nNew weights (layer 1) after training: ")
+    print (neural_network.weights1)
+    print ("\nNew weights (layer 2) after training: ")
+    print (neural_network.weights2)
+    print ("\nNew weights (layer 3) after training: ")
+    print (neural_network.weights3)
+
   
         
     
