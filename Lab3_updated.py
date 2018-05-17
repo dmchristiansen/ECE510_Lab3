@@ -4,6 +4,8 @@
 
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder
+import matplotlib.pyplot as plt
+import random
 
 # globals
 data_file = 'iris.data'
@@ -55,11 +57,11 @@ class Network:
         WEIGHT_FRAC_BITS = 12
 
         # intialize weights for input -> hidden layer 1
-        self.w_i1 = np.int16((np.random.random((h1_size, 4)) - 0.5) * (2 ** (WEIGHT_FRAC_BITS - 3)))
+        self.w_i1 = np.int16((np.random.random((h1_size, 4)) - 0.5) * (2 ** (WEIGHT_FRAC_BITS)))
         # initialize weights for hidden layer 1 -> hidden layer 2
-        self.w_12 = np.int16((np.random.random((h2_size, h1_size)) - 0.5) * (2 ** (WEIGHT_FRAC_BITS - 3)))
+        self.w_12 = np.int16((np.random.random((h2_size, h1_size)) - 0.5) * (2 ** (WEIGHT_FRAC_BITS)))
         # initialize weights for hidden layer 2 -> output
-        self.w_2o = np.int16((np.random.random((3, h2_size)) - 0.5) * (2 ** (WEIGHT_FRAC_BITS - 3)))
+        self.w_2o = np.int16((np.random.random((3, h2_size)) - 0.5) * (2 ** (WEIGHT_FRAC_BITS)))
 
         self.hidden1_size = h1_size
         self.hidden2_size = h2_size
@@ -143,15 +145,16 @@ class Network:
     Forward propagation routine
     Currently not using a bias input
     """
-    def forward_propogate(self, x, training=False):
+    def forward_propogate(self, x, training=False, verbose=False):
         # Feed Forword pass
         # reformat x from u4.4 to u4.12, multiply with weights
-        hidden_1 = self.fp_mat_mul(self.w_i1, (np.int16(x) * (2 ** 12)))
+        hidden_1 = self.fp_mat_mul(self.w_i1, (np.int16(x) * (2 ** 8)))
         # result is in s15.24 format, reformat to s3.12
         hidden_1 = np.int16(np.right_shift(hidden_1, 12))
         # apply sigmoid function, which returns format u4.12
         hidden_1 = self.sigmoid(hidden_1)
-        #print(hidden_1)
+        if verbose == True:
+            print(hidden_1/(2**12))
 
         # multiply hidden layer 1 output with hidden layer 2's weights
         # u4.12 (h1 output) * s3.12 (weights) = s15.24
@@ -159,7 +162,8 @@ class Network:
         # reformat from s15.24 to s3.12
         hidden_2 = np.int16(np.right_shift(hidden_2, 12))
         hidden_2 = self.sigmoid(hidden_2)
-        #print(hidden_2)
+        if verbose == True:
+            print(hidden_2/(2**12))
 
         # multiply hidden layer 2 output with output layer's weights
         # u4.12 (h2 output) * s3.12 (weights) = s15.24
@@ -167,7 +171,8 @@ class Network:
         # reformat from s15.24 to s3.12
         output = np.int16(np.right_shift(output, 12))
         output = self.sigmoid(output)
-        #print(output)
+        if verbose == True:
+            print(output /(2**12))
 
         # return hidden layer outputs if this is part of training...
         if training == True:
@@ -203,7 +208,7 @@ class Network:
 
         return result
 
-    def fit(self):
+    def fit(self, verbose=False):
 
         accuracy_on_test = []
         accuracy_on_train = []
@@ -232,47 +237,69 @@ class Network:
                 # calculate output layer error
                 # delta_output = output * (1 - output) * (target - output)
                 output_delta = self.vector_mult(self.vector_mult(output, (np.int16(4096) - output)), (y - output))
-                #print("d_out ", output_delta)
+                if verbose == True:
+                    print("d_out ", output_delta/(2**12))
+
                 # calculate hidden_2 layer error
                 # delta_h2 = h_2 * (1 - h_2) * sum(w_2o
                 w_d = np.asarray([self.fp_dot(output_delta, self.w_2o[:, col]) for col in range(self.w_2o.shape[1])])
                 w_d = np.int16(np.right_shift(w_d, 12))
                 delta_hidden2 = self.vector_mult(self.vector_mult(hidden_2, (np.int16(4096) - hidden_2)), w_d)
-                #print("dh2 ", delta_hidden2)
+                if verbose == True:
+                    print("dh2 ", delta_hidden2/(2**12))
 
                 # calculate hidden_1 layer error
                 w_d = np.asarray([self.fp_dot(delta_hidden2, self.w_12[:, col]) for col in range(self.w_12.shape[1])])
                 w_d = np.int16(np.right_shift(w_d, 12))
                 delta_hidden1 = self.vector_mult(self.vector_mult(hidden_1, (np.int16(4096) - hidden_1)), w_d)
-                #print("dh1 ", delta_hidden1)
+                if verbose == True:
+                    print("dh1 ", delta_hidden1/(2**12))
 
                 # weights update
                 #self.w_2o -= self.eta * output_delta
+                dw_2o = np.zeros(self.w_2o.shape, dtype=np.int16)
                 for r in range(self.w_2o.shape[0]):
                     for c in range(self.w_2o.shape[1]):
                         #print(self.fp_mult(self.fp_mult(self.eta, output_delta[r]), hidden_2[c]))
-                        self.w_2o[r, c] -= self.fp_mult(self.fp_mult(self.eta, output_delta[r]), hidden_2[c])
+                        dw_2o[r, c] = self.fp_mult(self.fp_mult(self.eta, output_delta[r]), hidden_2[c])
+
+                self.w_2o -= dw_2o
+                if verbose == True:
+                    print("w_2o deltas")
+                    print(dw_2o/(2**12))
+
 
                 #self.w_12 -= self.eta * hidden_2_delta
+                dw_12 = np.zeros(self.w_12.shape, dtype=np.int16)
                 for r in range(self.w_12.shape[0]):
                     for c in range(self.w_12.shape[1]):
                         #print(self.fp_mult(self.fp_mult(self.eta, delta_hidden2[r]), hidden_1[c]))
-                        self.w_12[r, c] -= self.fp_mult(self.fp_mult(self.eta, delta_hidden2[r]), hidden_1[c])
+                        dw_12[r, c] = self.fp_mult(self.fp_mult(self.eta, delta_hidden2[r]), hidden_1[c])
 
+                self.w_12 -= dw_12
+                if verbose == True:
+                    print("w_12 deltas")
+                    print(dw_12/(2**12))
 
                 #self.w_i1 -= self.eta * hidden_1_delta
+                dw_i1 = np.zeros(self.w_i1.shape, dtype=np.int16)
                 for r in range(self.w_i1.shape[0]):
                     for c in range(self.w_i1.shape[1]):
-                        #print(self.fp_mult(self.fp_mult(self.eta, delta_hidden1[r]), x[c]))
-                        self.w_i1[r, c] -= self.fp_mult(self.fp_mult(self.eta, delta_hidden1[r]), x[c])
+                        #print(self.fp_mult(self.fp_mult(self.eta, delta_hidden1[r]), (np.int16(x[c]) * (2**8))))
+                        dw_i1[r, c] = self.fp_mult(self.fp_mult(self.eta, delta_hidden1[r]), (np.int16(x[c]) * (2**8)))
 
-                """
-                print("prediction: ", prediction, ", label: ", self.labels[i])
-                if (prediction == self.labels[i]).all():
-                    print("correct")
-                else:
-                    print("incorrect")
-                """
+                self.w_i1 -= dw_i1
+                if verbose == True:
+                    print("w_i1 deltas")
+                    print(dw_i1/(2**12))
+
+                if verbose == True:
+                    print("prediction: ", prediction, ", label: ", self.labels[i])
+                    if (prediction == self.labels[i]).all():
+                        print("correct")
+                    else:
+                        print("incorrect")
+
 
             # calculate accuracy for epoch
             correct = 0
@@ -289,7 +316,7 @@ class Network:
             
         # Plots for training process:accuracy
         plt.figure(0)
-        plt.plot(accuracy_on_train,'r')
+        plt.plot(accuracy_on_train,'r') #/home/daniel
         plt.xticks(np.arange(0, 2000, 100.0))
         plt.rcParams['figure.figsize'] = (8, 6)
         plt.xlabel("Num of Epochs")
@@ -310,21 +337,26 @@ if __name__ == '__main__':
     samples = x
     labels = labels_
     eta = 0.1
-    
+
+    # shuffle
+    rand_index = np.random.permutation(150)
+    samples = samples[rand_index]
+    labels = labels[rand_index]
+
     
     MLP = Network(3, 3, eta, samples, labels, epochs=2000)
     print ("Random starting weights (layer 1): ")
-    print(MLP.w_i1)
+    print(MLP.w_i1/(2**12))
     print ("\nRandom starting weights (layer 2): ")
-    print(MLP.w_12)
+    print(MLP.w_12/(2**12))
     print ("\nRandom starting weights (layer 3): ")
-    print(MLP.w_2o)
+    print(MLP.w_2o/(2**12))
 
     MLP.fit()
     
     print ("\nNew weights (layer 1) after training: ")
-    print(MLP.w_i1)
+    print(MLP.w_i1/(2**12))
     print ("\nNew weights (layer 2) after training: ")
-    print(MLP.w_12)
+    print(MLP.w_12/(2**12))
     print ("\nNew weights (layer 3) after training: ")
-    print(MLP.w_2o)
+    print(MLP.w_2o/(2**12))
