@@ -10,6 +10,7 @@ from keras.optimizers import SGD #Stochastic Gradient Descent Optimizer
 iris = load_iris()
 #inputs contain 4 features
 X = iris.data[:, 0:4]
+X = X/np.max(X)
 #labels
 y = iris.target
 #print the distinct y labels
@@ -31,9 +32,15 @@ def baseline_network():
     return model
 
 neural_network = baseline_network()
-neural_network.fit(X,Y, epochs=2000, batch_size=1)
+history = neural_network.fit(X,Y, epochs=1000)
 
 np.set_printoptions(suppress=True)
 prediction = neural_network.predict(X, batch_size=1, verbose=0)
-print("Prediction \n" + str(prediction))
-print("Target \n" + str(Y))
+
+plt.figure(0)
+plt.plot(history.history['acc'],'r')
+plt.xticks(np.arange(0, 500, 100.0))
+plt.rcParams['figure.figsize'] = (8, 6)
+plt.xlabel("Num of Epochs")
+plt.ylabel("Accuracy")
+plt.legend(['train'])
