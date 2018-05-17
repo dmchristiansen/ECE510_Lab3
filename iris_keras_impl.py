@@ -1,4 +1,5 @@
 #Import necessary packages
+import numpy as np
 from sklearn.datasets import load_iris
 from sklearn.preprocessing import LabelBinarizer
 from keras.models import Sequential #Sequential Models
