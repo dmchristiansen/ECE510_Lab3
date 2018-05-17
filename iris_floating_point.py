@@ -9,6 +9,9 @@ class NeuralNetwork():
         # Number of nodes in hidden layers
         l2 = 3     # layer 2
         l3 = 3     # Layer 3
+        
+        # Learning rate
+        self.eta = 0.1
 
         # assign random weights
         self.weights1 = np.random.uniform(low = -0.05, high= +0.05, size= ((4, l2)))
@@ -25,6 +28,7 @@ class NeuralNetwork():
     # train neural network
     def train(self, training_set_inputs, training_set_outputs, number_of_training_iterations):
         correct = 0
+        accuracy_on_train = []
         total = 0
         for epoch in range(number_of_training_iterations):     # StochasticGD implementation
             for samples in range(training_set_inputs.shape[0]):
@@ -49,9 +53,9 @@ class NeuralNetwork():
                 gradient1 = dot(training_set_inputs_.T, del2.T)
 
                 # adjust weights accordingly
-                self.weights1 += gradient1
-                self.weights2 += gradient2
-                self.weights3 += gradient3
+                self.weights1 += self.eta * gradient1
+                self.weights2 += self.eta * gradient2
+                self.weights3 += self.eta * gradient3
                 
             for i in range(training_set_inputs.shape[0]):
         
@@ -66,6 +70,17 @@ class NeuralNetwork():
 
             accuracy = correct / total
             print("epoch: ", epoch, ", accuracy: ", accuracy)
+            accuracy_on_train.append(accuracy)
+            
+        # Plots for training process:accuracy
+        plt.figure(0)
+        plt.plot(accuracy_on_train,'r')
+        plt.xticks(np.arange(0, 8000, 100.0))
+        plt.rcParams['figure.figsize'] = (8, 6)
+        plt.xlabel("Num of Epochs")
+        plt.ylabel("Accuracy")
+        plt.title("Training Accuracy")
+        plt.legend(['train'])
 
     def forward_pass(self, inputs):
         # pass inputs through neural network
@@ -84,8 +99,7 @@ if __name__ == "__main__":
     X = X/np.max(X)
     #labels
     y = iris.target
-    #print the distinct y labels
-    print(np.unique(y))
+   
     '''
     #One Hot Encode Y
     encoder = LabelBinarizer()
@@ -97,7 +111,7 @@ if __name__ == "__main__":
     labels_ = enc.transform(y_).toarray()   # one hot encoding of y
     
     neural_network = NeuralNetwork()
-    
+
     print ("Random starting weights (layer 1): ")
     print (neural_network.weights1)
     print ("\nRandom starting weights (layer 2): ")
@@ -109,7 +123,7 @@ if __name__ == "__main__":
     training_set_inputs = X
     training_set_outputs = labels_
 
-    neural_network.train(training_set_inputs, training_set_outputs, 2000)
+    neural_network.train(training_set_inputs, training_set_outputs, 8000)
 
     print ("\nNew weights (layer 1) after training: ")
     print (neural_network.weights1)
@@ -118,6 +132,14 @@ if __name__ == "__main__":
     print ("\nNew weights (layer 3) after training: ")
     print (neural_network.weights3)
 
+
+    '''
+    temp = np.zeros(3)
+    for i in range(output.shape[0]):
+        temp[np.argmax(output[i,:])] = 1
+        prediction[i] = temp
+       
+    '''
   
         
     
