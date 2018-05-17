@@ -285,6 +285,17 @@ class Network:
 
             accuracy = correct / total
             print("epoch: ", epoch, ", accuracy: ", accuracy)
+            accuracy_on_train.append(accuracy)
+            
+        # Plots for training process:accuracy
+        plt.figure(0)
+        plt.plot(accuracy_on_train,'r')
+        plt.xticks(np.arange(0, 2000, 100.0))
+        plt.rcParams['figure.figsize'] = (8, 6)
+        plt.xlabel("Num of Epochs")
+        plt.ylabel("Accuracy")
+        plt.title("Training Accuracy")
+        plt.legend(['train'])
 
 
     
@@ -302,9 +313,18 @@ if __name__ == '__main__':
     
     
     MLP = Network(3, 3, eta, samples, labels, epochs=2000)
-
+    print ("Random starting weights (layer 1): ")
+    print(MLP.w_i1)
+    print ("\nRandom starting weights (layer 2): ")
+    print(MLP.w_12)
+    print ("\nRandom starting weights (layer 3): ")
     print(MLP.w_2o)
 
     MLP.fit()
-
+    
+    print ("\nNew weights (layer 1) after training: ")
+    print(MLP.w_i1)
+    print ("\nNew weights (layer 2) after training: ")
+    print(MLP.w_12)
+    print ("\nNew weights (layer 3) after training: ")
     print(MLP.w_2o)
